@@ -9,7 +9,7 @@ interface VcfUploaderProps {
   error?: string
 }
 
-const MAX_SIZE = 50 * 1024 * 1024
+const MAX_SIZE = 5 * 1024 * 1024
 
 export function VcfUploader({ onFileSelect, error }: VcfUploaderProps) {
   const [file, setFile] = useState<File | null>(null)
@@ -22,7 +22,7 @@ export function VcfUploader({ onFileSelect, error }: VcfUploaderProps) {
       return "Only .vcf and .vcf.gz files are accepted."
     }
     if (f.size > MAX_SIZE) {
-      return "File must be under 50MB."
+      return "File must be under 5MB."
     }
     return null
   }, [])
@@ -124,7 +124,7 @@ export function VcfUploader({ onFileSelect, error }: VcfUploaderProps) {
               Drop your VCF file here or click to browse
             </p>
             <p className="text-xs text-muted-foreground">
-              Accepts .vcf and .vcf.gz files up to 50MB
+              Accepts .vcf and .vcf.gz files up to 5MB
             </p>
           </div>
         </div>

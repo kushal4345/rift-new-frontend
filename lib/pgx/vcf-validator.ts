@@ -6,10 +6,10 @@ export class VcfValidationError extends Error {
 }
 
 export function validateVcf(file: File): void {
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
     if (file.size > MAX_FILE_SIZE) {
-        throw new VcfValidationError("VCF file must be under 50MB.", "FILE_TOO_LARGE");
+        throw new VcfValidationError("VCF file must be under 5MB.", "FILE_TOO_LARGE");
     }
 
     const fileName = file.name.toLowerCase();
