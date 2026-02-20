@@ -3,8 +3,9 @@ import { AnalysisRequestSchema } from "@/lib/pgx/types"
 import { API_CONFIG } from "@/lib/pgx/api-config"
 import { validateVcf, VcfValidationError } from "@/lib/pgx/vcf-validator"
 import { runAnalysisPipeline } from "@/lib/pgx/analysis-pipeline"
+import { generateExplanation } from "@/lib/pgx/explanation-service"
 import { SUPPORTED_DRUGS } from "@/lib/pgx/types"
-import type { LanguageCode, ClinicalOutput } from "@/lib/pgx/types"
+import type { LanguageCode, ClinicalOutput, ExplanationInput } from "@/lib/pgx/types"
 
 // ── Helper: call LLM for a SINGLE drug, with one retry on failure ──────────
 async function fetchLlmExplanation(
@@ -109,9 +110,30 @@ export async function POST(req: NextRequest) {
     // ── For each drug result, call the external LLM API individually ─────
     const finalResults: ClinicalOutput[] = []
     let quotaExceededMessage: string | undefined
+    let successfulLlmCount = 0
 
     for (const r of rawResults) {
-      // Build minimal per-drug payload the LLM API accepts (one drug at a time)
+      // 1. Generate localized baseline explanation using internal engine
+      // This ensures even rule-based fallback is translated correctly.
+      const expInput: ExplanationInput = {
+        drug: r.drug,
+        gene: r.pharmacogenomic_profile.primary_gene,
+        phenotype: r.pharmacogenomic_profile.phenotype,
+        risk_label: r.risk_assessment.risk_label,
+        severity: r.risk_assessment.severity,
+        confidence_score: r.risk_assessment.confidence_score,
+        cpic_level: r.clinical_recommendation.cpic_level,
+        preferred_language: preferredLanguage,
+      }
+
+      const internalExp = generateExplanation(expInput)
+      const baselineExplanation = {
+        summary: internalExp.clinician.summary,
+        detailed_explanation: internalExp.clinician.clinical_meaning,
+        mechanism: internalExp.clinician.mechanism,
+      }
+
+      // 2. Build minimal per-drug payload for external LLM
       const llmPayload = {
         drug: r.drug,
         gene: r.pharmacogenomic_profile.primary_gene,
@@ -125,22 +147,24 @@ export async function POST(req: NextRequest) {
 
       const { data: llmResponse, quotaExceeded, errorDetail } = await fetchLlmExplanation(llmPayload, 1)
 
-      let finalExplanation = r.llm_generated_explanation
+      let finalExplanation = baselineExplanation
       if (llmResponse?.llm_generated_explanation) {
+        successfulLlmCount++
         const ext = llmResponse.llm_generated_explanation
-        // Map localized keys to internal structure
-        // The API seems to return clinician_en, patient_en, etc.
-        const summary = ext.clinician_en || ext.clinician_hi || ext.summary || r.llm_generated_explanation.summary
-        const detailed = ext.clinician_en || ext.clinician_hi || ext.detailed_explanation || r.llm_generated_explanation.detailed_explanation
-        const mechanism = ext.mechanism || r.llm_generated_explanation.mechanism
+
+        // Dynamic key mapping based on language code prefix (e.g., clinician_bn for bn-IN)
+        const langPrefix = preferredLanguage.split("-")[0]
+        const clinicianKey = `clinician_${langPrefix}`
+        const patientKey = `patient_${langPrefix}`
+
+        const summary = ext[clinicianKey] || ext.summary || baselineExplanation.summary
+        const detailed = ext[clinicianKey] || ext.detailed_explanation || baselineExplanation.detailed_explanation
+        const mechanism = ext.mechanism || baselineExplanation.mechanism
 
         finalExplanation = {
-          ...r.llm_generated_explanation,
           summary,
           detailed_explanation: detailed,
           mechanism: mechanism,
-          // Extract patient view if available
-          patient_summary: ext.patient_en || ext.patient_hi || (r as any).patient_summary,
         }
       }
 
@@ -161,10 +185,11 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Surface quota error as a warning (not a fatal error — results still returned)
-    if (quotaExceededMessage) {
+    // Only surface quota warning if ALL LLM attempts failed and we hit a quota
+    if (quotaExceededMessage && successfulLlmCount === 0) {
       errors.push({ message: quotaExceededMessage, code: "LLM_QUOTA_EXCEEDED" })
     }
+
 
 
     if (finalResults.length === 0 && errors.length === 0) {
