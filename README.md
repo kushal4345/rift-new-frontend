@@ -6,7 +6,7 @@
 👩‍💻 **Team Members:** Saisha Handa, Kushal Sharma
 
 🎥 **Live Demo:**  
-[Google Drive Demo](https://drive.google.com/file/d/1EnPJ8PD0dNMHdf1Qy8YTWkKqWKMAzCGs/view?usp=sharing)
+[Live Demo](https://rift-new-frontend.vercel.app/)
 
 📱 **LinkedIn Demo Video:**  
 [LinkedIn Post](https://www.linkedin.com/posts/saisha-handa-5809a6270_rift2026-pharmaguard-pharmacogenomics-activity-7430428519840522240-dwJM?utm_source=share&utm_medium=member_android&rcm=ACoAAEJawbABtKp1AUrsBp0KHFvHO0RrIg3rpXY)
@@ -119,7 +119,6 @@ LLM_API_KEY=your_key_here
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 ---
 
@@ -162,6 +161,4 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 # 📜 License
 MIT License
 
----
 
-**Built with precision for 404 BRAIN NOT FOUND and the RIFT 2026 Pharmacogenomics deployment.**
